@@ -5,18 +5,6 @@ import { withCategorySections } from './boqSections.js';
 const formatINR = (n) =>
   Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function drawStamp(doc, cx, cy, r = 34) {
-  doc.save();
-  doc.strokeColor('#2b6cb0').lineWidth(2);
-  doc.circle(cx, cy, r).stroke();
-  doc.lineWidth(1);
-  doc.circle(cx, cy, r - 8).stroke();
-  doc.fillColor('#2b6cb0').font('Helvetica-Bold').fontSize(8);
-  doc.text('ORANGE', cx - 20, cy - 10, { width: 40, align: 'center' });
-  doc.text('INTERIOR', cx - 22, cy + 2, { width: 44, align: 'center' });
-  doc.restore();
-}
-
 export function buildBoqPdf(boq, res) {
   const doc = new PDFDocument({ margin: 28, size: 'A4' });
   res.setHeader('Content-Type', 'application/pdf');
@@ -212,7 +200,6 @@ export function buildBoqPdf(boq, res) {
     payY += h + 6;
   });
 
-  drawStamp(doc, left + colW * 2 + 28, startY + 34, 30);
   doc.fillColor('#111').font('Helvetica').fontSize(9)
     .text('Proprietor', left + colW * 2 + 50, startY + 70, { width: colW - 50, align: 'right' });
 
