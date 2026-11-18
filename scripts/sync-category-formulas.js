@@ -22,7 +22,7 @@ async function run() {
     cat.formulaType = inferred;
     await cat.save();
     updated += 1;
-    console.log(`${cat.code || '-'} ${cat.name} → ${inferred}`);
+    console.log(`${cat.name} → ${inferred}`);
   }
   console.log(`Updated ${updated} categories`);
   await mongoose.disconnect();

@@ -6,9 +6,40 @@ const router = express.Router();
 
 router.use(protect, authorize('superadmin'));
 
-router.get('/', async (_req, res) => {
-  const users = await User.find().select('-password').sort({ createdAt: -1 });
-  res.json(users);
+router.get('/', async (req, res) => {
+  try {
+    const { q, role, page, limit } = req.query;
+    const filter = {};
+    if (role) filter.role = role;
+    if (q) {
+      filter.$or = [
+        { name: new RegExp(q, 'i') },
+        { email: new RegExp(q, 'i') },
+        { phone: new RegExp(q, 'i') },
+      ];
+    }
+
+    if (page !== undefined) {
+      const pageNum = Math.max(1, Number(page) || 1);
+      const lim = Math.min(100, Math.max(1, Number(limit) || 10));
+      const skip = (pageNum - 1) * lim;
+      const [items, total] = await Promise.all([
+        User.find(filter).select('-password').sort({ createdAt: -1 }).skip(skip).limit(lim),
+        User.countDocuments(filter),
+      ]);
+      return res.json({
+        items,
+        total,
+        page: pageNum,
+        pages: Math.ceil(total / lim) || 1,
+      });
+    }
+
+    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 router.post('/', async (req, res) => {

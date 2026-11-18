@@ -10,7 +10,7 @@ router.use(protect);
 
 router.get('/', async (req, res) => {
   try {
-    const { type, parent, tree } = req.query;
+    const { type, parent, tree, q, page, limit, formulaType } = req.query;
     if (tree === '1' || tree === 'true') {
       const all = await Category.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean();
       const categories = all.filter((c) => c.type === 'category');
@@ -34,7 +34,37 @@ router.get('/', async (req, res) => {
 
     const filter = {};
     if (type) filter.type = type;
+    if (formulaType) filter.formulaType = formulaType;
     if (parent) filter.parent = parent === 'null' ? null : parent;
+    if (q) {
+      filter.$or = [
+        { name: new RegExp(q, 'i') },
+        { description: new RegExp(q, 'i') },
+      ];
+    }
+
+    // Paginated list for admin tables
+    if (page !== undefined) {
+      const pageNum = Math.max(1, Number(page) || 1);
+      const lim = Math.min(100, Math.max(1, Number(limit) || 10));
+      const skip = (pageNum - 1) * lim;
+      const [items, total] = await Promise.all([
+        Category.find(filter)
+          .populate('parent', 'name type')
+          .sort({ sortOrder: 1, name: 1 })
+          .skip(skip)
+          .limit(lim),
+        Category.countDocuments(filter),
+      ]);
+      return res.json({
+        items,
+        total,
+        page: pageNum,
+        pages: Math.ceil(total / lim) || 1,
+      });
+    }
+
+    // Full list for dropdowns / product forms
     const list = await Category.find(filter).populate('parent', 'name type').sort({ sortOrder: 1, name: 1 });
     res.json(list);
   } catch (err) {
@@ -50,13 +80,12 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', authorize('superadmin', 'staff'), upload.single('image'), async (req, res) => {
   try {
-    const { name, code, description, type, parent, sortOrder, formulaType } = req.body;
+    const { name, description, type, parent, sortOrder, formulaType } = req.body;
     if (!name || !type) return res.status(400).json({ message: 'Name and type required' });
 
-    const allowedFormula = ['none', 'W_H', 'W_D'];
+    const allowedFormula = ['none', 'W_H', 'W_D', 'W_H_D'];
     const cat = await Category.create({
       name,
-      code: code || '',
       description: description || '',
       type,
       parent: parent || null,
@@ -75,13 +104,12 @@ router.put('/:id', authorize('superadmin'), upload.single('image'), async (req, 
     const cat = await Category.findById(req.params.id);
     if (!cat) return res.status(404).json({ message: 'Category not found' });
 
-    const { name, code, description, type, parent, sortOrder, isActive, formulaType } = req.body;
+    const { name, description, type, parent, sortOrder, isActive, formulaType } = req.body;
     if (name) cat.name = name;
-    if (code !== undefined) cat.code = code;
     if (description !== undefined) cat.description = description;
     if (type) cat.type = type;
     if (parent !== undefined) cat.parent = parent || null;
-    if (formulaType !== undefined && ['none', 'W_H', 'W_D'].includes(formulaType)) {
+    if (formulaType !== undefined && ['none', 'W_H', 'W_D', 'W_H_D'].includes(formulaType)) {
       cat.formulaType = formulaType;
     }
     if (sortOrder !== undefined) cat.sortOrder = Number(sortOrder) || 0;
@@ -149,15 +177,23 @@ router.post('/import', authorize('superadmin', 'staff'), upload.single('file'), 
         let formulaType = 'none';
         if (rawFormula === 'W_H' || rawFormula === 'WH' || rawFormula === 'WXH') formulaType = 'W_H';
         else if (rawFormula === 'W_D' || rawFormula === 'WD' || rawFormula === 'WXD') formulaType = 'W_D';
+        else if (
+          rawFormula === 'W_H_D' ||
+          rawFormula === 'WHD' ||
+          rawFormula === 'WXHXD' ||
+          rawFormula === 'W_H_X_D'
+        ) {
+          formulaType = 'W_H_D';
+        }
 
         await Category.create({
           name: String(name).trim(),
-          code: String(row.code || row.Code || ''),
           description: String(row.description || row.Description || ''),
           type,
           parent: parentId,
           formulaType,
           sortOrder: Number(row.sortOrder || row.SortOrder || 0),
+          image: String(row.image || row.Image || ''),
         });
         created += 1;
       } catch (e) {

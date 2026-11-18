@@ -9,8 +9,8 @@ const lineItemSchema = new mongoose.Schema(
     brand: { type: String, default: '' },
     image: { type: String, default: '' },
     unit: { type: String, default: 'Nos' },
-    /** none | W_H | W_D — from formula sheet */
-    formulaType: { type: String, enum: ['none', 'W_H', 'W_D'], default: 'none' },
+    /** none | W_H | W_D | W_H_D — from formula sheet */
+    formulaType: { type: String, enum: ['none', 'W_H', 'W_D', 'W_H_D'], default: 'none' },
     width: { type: Number, default: 0 },
     height: { type: Number, default: 0 },
     depth: { type: Number, default: 0 },

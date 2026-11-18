@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 const categorySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    code: { type: String, trim: true, default: '' },
     description: { type: String, default: '' },
     type: {
       type: String,
@@ -12,10 +11,10 @@ const categorySchema = new mongoose.Schema(
     },
     parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     image: { type: String, default: '' },
-    /** BOQ qty formula: none = Qty×Rate; W_H = Nos×(W×H); W_D = Nos×(W×D) */
+    /** BOQ qty formula: none | W_H | W_D | W_H_D */
     formulaType: {
       type: String,
-      enum: ['none', 'W_H', 'W_D'],
+      enum: ['none', 'W_H', 'W_D', 'W_H_D'],
       default: 'none',
     },
     sortOrder: { type: Number, default: 0 },

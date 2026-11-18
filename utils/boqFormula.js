@@ -5,11 +5,22 @@ export const FORMULA_TYPES = {
   NONE: 'none',
   W_H: 'W_H',
   W_D: 'W_D',
+  W_H_D: 'W_H_D',
 };
+
+const AREA_FORMULAS = new Set([FORMULA_TYPES.W_H, FORMULA_TYPES.W_D, FORMULA_TYPES.W_H_D]);
+
+export function isAreaFormula(formulaType) {
+  return AREA_FORMULAS.has(formulaType);
+}
 
 export function inferFormulaType(name = '') {
   const n = String(name).toLowerCase();
   if (!n) return FORMULA_TYPES.NONE;
+
+  if (/volume|cubicle|tank\b|sump|rcc\s*column|concrete/.test(n)) {
+    return FORMULA_TYPES.W_H_D;
+  }
 
   if (/ceiling|flooring|floor\b|rcc|slab|lintel/.test(n)) {
     return FORMULA_TYPES.W_D;
@@ -32,9 +43,7 @@ export function inferFormulaType(name = '') {
 
 function categoryFormula(category = null) {
   if (!category) return null;
-  if (category.formulaType === FORMULA_TYPES.W_H || category.formulaType === FORMULA_TYPES.W_D) {
-    return category.formulaType;
-  }
+  if (isAreaFormula(category.formulaType)) return category.formulaType;
   if (!category.formulaType || category.formulaType === 'auto') {
     return inferFormulaType(category.name);
   }
@@ -51,27 +60,19 @@ export function resolveFormulaType(item = {}, category = null, { preferItem = fa
   }
 
   const productFormula = product?.formulaType ?? item.productFormulaType;
-  if (
-    productFormula === FORMULA_TYPES.NONE ||
-    productFormula === FORMULA_TYPES.W_H ||
-    productFormula === FORMULA_TYPES.W_D
-  ) {
+  if (productFormula === FORMULA_TYPES.NONE || isAreaFormula(productFormula)) {
     return productFormula;
   }
 
   const fromCat = categoryFormula(category);
-  if (fromCat === FORMULA_TYPES.W_H || fromCat === FORMULA_TYPES.W_D) {
-    return fromCat;
-  }
+  if (isAreaFormula(fromCat)) return fromCat;
 
   if (item.categoryLabel) {
     const inferred = inferFormulaType(item.categoryLabel);
     if (inferred !== FORMULA_TYPES.NONE) return inferred;
   }
 
-  if (item.formulaType === FORMULA_TYPES.W_H || item.formulaType === FORMULA_TYPES.W_D) {
-    return item.formulaType;
-  }
+  if (isAreaFormula(item.formulaType)) return item.formulaType;
 
   const unit = String(item.unit || product?.unit || '').toLowerCase();
   if (unit === 'sft' || unit === 'sqm') return FORMULA_TYPES.W_H;
@@ -84,9 +85,6 @@ export function resolveProductBoqInfo(product = {}, category = null) {
   return { unit, formulaType };
 }
 
-/**
- * Feet.inches input: 5.5 = 5'5", 2.1 = 2'1", 10.11 = 10'11"
- */
 export function splitFeetInches(value) {
   if (value === '' || value == null) return null;
   const str = String(value).trim();
@@ -120,9 +118,8 @@ export function parseFeetInchesInput(value) {
 
 /**
  * Nos is always 1.
- * W/D/H use feet.inches for area math.
- * - No formula:  Amount = Quantity × Rate
- * - With formula: Amount = Quantity × W × H (or D) × Rate
+ * - none: Amount = Quantity × Rate
+ * - W_H / W_D / W_H_D: Amount = Quantity × formula × Rate
  */
 export function calcLineItem(item = {}) {
   const rate = Number(item.rate) || 0;
@@ -137,13 +134,15 @@ export function calcLineItem(item = {}) {
     formulaArea = w * h;
   } else if (formulaType === FORMULA_TYPES.W_D) {
     formulaArea = w * d;
+  } else if (formulaType === FORMULA_TYPES.W_H_D) {
+    formulaArea = w * h * d;
   }
 
   const rawQty = Number(item.quantity);
   let quantity;
   if (Number.isFinite(rawQty) && rawQty >= 0) {
     quantity = rawQty;
-  } else if (formulaType === FORMULA_TYPES.W_H || formulaType === FORMULA_TYPES.W_D) {
+  } else if (isAreaFormula(formulaType)) {
     const legacyNos = Number(item.nos);
     quantity = Number.isFinite(legacyNos) && legacyNos > 0 ? legacyNos : 1;
   } else {

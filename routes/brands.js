@@ -8,9 +8,34 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const brands = await Brand.find().sort({ name: 1 });
+    const { q, page, limit } = req.query;
+    const filter = {};
+    if (q) {
+      filter.$or = [
+        { name: new RegExp(q, 'i') },
+        { description: new RegExp(q, 'i') },
+      ];
+    }
+
+    if (page !== undefined) {
+      const pageNum = Math.max(1, Number(page) || 1);
+      const lim = Math.min(100, Math.max(1, Number(limit) || 10));
+      const skip = (pageNum - 1) * lim;
+      const [items, total] = await Promise.all([
+        Brand.find(filter).sort({ name: 1 }).skip(skip).limit(lim),
+        Brand.countDocuments(filter),
+      ]);
+      return res.json({
+        items,
+        total,
+        page: pageNum,
+        pages: Math.ceil(total / lim) || 1,
+      });
+    }
+
+    const brands = await Brand.find(filter).sort({ name: 1 });
     res.json(brands);
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -19,17 +19,26 @@ router.use(protect);
 
 router.get('/', async (req, res) => {
   try {
-    const { q, category, subcategory, childCategory, page = 1, limit = 50 } = req.query;
+    const { q, category, subcategory, childCategory, unit, formulaType, page = 1, limit = 50 } = req.query;
     const filter = {};
-    if (q) filter.$text = { $search: q };
+    if (q) {
+      filter.$or = [
+        { name: new RegExp(q, 'i') },
+        { specification: new RegExp(q, 'i') },
+        { brand: new RegExp(q, 'i') },
+        { remarks: new RegExp(q, 'i') },
+      ];
+    }
     if (category) filter.category = category;
     if (subcategory) filter.subcategory = subcategory;
     if (childCategory) filter.childCategory = childCategory;
+    if (unit) filter.unit = unit;
+    if (formulaType) filter.formulaType = formulaType;
 
     const skip = (Number(page) - 1) * Number(limit);
     const [items, total] = await Promise.all([
       Product.find(filter)
-        .populate('category', 'name code formulaType')
+        .populate('category', 'name formulaType')
         .populate('subcategory', 'name')
         .populate('childCategory', 'name')
         .sort({ createdAt: -1 })
@@ -45,14 +54,14 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   const product = await Product.findById(req.params.id)
-    .populate('category', 'name code formulaType')
+    .populate('category', 'name formulaType')
     .populate('subcategory', 'name')
     .populate('childCategory', 'name');
   if (!product) return res.status(404).json({ message: 'Product not found' });
   res.json(product);
 });
 
-const allowedProductFormula = ['inherit', 'none', 'W_H', 'W_D'];
+const allowedProductFormula = ['inherit', 'none', 'W_H', 'W_D', 'W_H_D'];
 
 router.post('/', authorize('superadmin', 'staff'), upload.single('image'), async (req, res) => {
   try {
@@ -214,6 +223,8 @@ router.post('/import', authorize('superadmin', 'staff'), upload.single('file'), 
           formulaType = 'W_H';
         } else if (rawFormula === 'W_D' || rawFormula === 'WD' || rawFormula === 'WXD') {
           formulaType = 'W_D';
+        } else if (rawFormula === 'W_H_D' || rawFormula === 'WHD' || rawFormula === 'WXHXD') {
+          formulaType = 'W_H_D';
         } else if (rawFormula === 'INHERIT' || rawFormula === 'CATEGORY') {
           formulaType = 'inherit';
         }

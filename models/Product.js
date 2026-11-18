@@ -8,11 +8,11 @@ const productSchema = new mongoose.Schema(
     unit: { type: String, default: 'Nos' },
     /**
      * inherit = use linked category formula
-     * none / W_H / W_D = product-level override (e.g. Nos item under Partition)
+     * none / W_H / W_D / W_H_D = product-level override
      */
     formulaType: {
       type: String,
-      enum: ['inherit', 'none', 'W_H', 'W_D'],
+      enum: ['inherit', 'none', 'W_H', 'W_D', 'W_H_D'],
       default: 'inherit',
     },
     rate: { type: Number, required: true, default: 0 },
